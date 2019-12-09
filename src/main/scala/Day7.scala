@@ -1,14 +1,14 @@
 
 case class Day7(programToRun: String) {
 
-  def calculateMaxValueSentToThrusters(): Int = {
+  def calculateMaxValueSentToThrusters(): Long = {
     val possibleValues = 0 to 4
     computePermutations(Vector.empty, possibleValues)
       .map(combination => combination.map(phase => IntcodeComputer(phase, programToRun)))
       .flatMap(combination => calculateValueSentToThrusters(0, combination: _*)).max
   }
 
-  def calculateValueSentToThrusters(input: Int, computers: IntcodeComputer*): Option[Int] = {
+  def calculateValueSentToThrusters(input: Long, computers: IntcodeComputer*): Option[Long] = {
     computers.foldLeft(Option(input)) { (phaseInput, phaseComputer) =>
       phaseInput match {
         case None => None
@@ -17,17 +17,17 @@ case class Day7(programToRun: String) {
     }
   }
 
-  def calculateMaxValueSentToThrustersLooped(): Int = {
+  def calculateMaxValueSentToThrustersLooped(): Long = {
     val possibleValues = 5 to 9
     computePermutations(Vector.empty, possibleValues)
       .map(combination => calculateValueSentToThrustersLooped(combination: _*)).max
   }
 
-  def calculateValueSentToThrustersLooped(phaseSettings: Int*): Int = {
+  def calculateValueSentToThrustersLooped(phaseSettings: Int*): Long = {
     val computers = phaseSettings.map(phase => IntcodeComputer(phase, programToRun, stopOnOutput = true))
 
     @scala.annotation.tailrec
-    def feedBackOutput(fedBackValue: Int): Int = {
+    def feedBackOutput(fedBackValue: Long): Long = {
       calculateValueSentToThrusters(fedBackValue, computers:_*) match {
         case None => fedBackValue
         case Some(newFedBackValue) => feedBackOutput(newFedBackValue)
