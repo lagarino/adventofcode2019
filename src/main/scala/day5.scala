@@ -1,3 +1,4 @@
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 case class MemoryContents(contents: String) {
@@ -21,13 +22,17 @@ case class Memory(contents: Array[Int]) {
   }
 }
 
-case class Runner(inputs: Int*) {
-  private val inputsReader = inputs.iterator
-  private val outputs = ListBuffer[Int]()
+case class IntcodeComputer(phase: Int, memoryContents: String, stopOnOutput: Boolean = false) {
+  private val memory = memoryContents.split(",").map(_.toInt)
+  private val inputsQueue = mutable.Queue[Int]()
+  inputsQueue.enqueue(phase)
+  private var outputs = ListBuffer[Int]()
+  private var instructionPointerState: Int = 0
 
-  def executeProgram(memoryContents: String): Vector[Int] = {
-    val memory = memoryContents.split(",").map(_.toInt)
-    executeInstruction(Memory(memory), 0)
+  def executeProgram(inputs: Int*): Vector[Int] = {
+    outputs = ListBuffer[Int]()
+    inputsQueue.enqueueAll(inputs)
+    executeInstruction(Memory(memory), instructionPointerState)
     outputs.toVector
   }
 
@@ -48,7 +53,12 @@ case class Runner(inputs: Int*) {
         executeInstruction(memory, instructionPointer+2)
       case 4 =>
         outputOp(memory, instructionPointer, memoryContents)
-        executeInstruction(memory, instructionPointer+2)
+        if (!stopOnOutput)
+          executeInstruction(memory, instructionPointer+2)
+        else {
+          instructionPointerState = instructionPointer+2
+          memory
+        }
       case 5 =>
         jumpIfTrueOp(memory, instructionPointer, memoryContents)
       case 6 =>
@@ -69,7 +79,7 @@ case class Runner(inputs: Int*) {
   }
 
   private def inputOp(memory: Memory, instructionPointer: Int) = {
-    val inputValue = inputsReader.next()
+    val inputValue = inputsQueue.dequeue()
     memory.setValue(instructionPointer + 1, inputValue)
   }
 
