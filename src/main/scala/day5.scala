@@ -7,50 +7,42 @@ case class MemoryContents(contents: String) {
     if (contents.length >= order + 2) contents.takeRight(order + 2).head.toString.toInt else 0
 }
 
-case class Memory(var contents: Array[Long]) {
-  def getContent(pointer: Int): MemoryContents = {
+case class Memory(var contents: mutable.Map[Long, Long]) {
+  def getContent(pointer: Long): MemoryContents = {
     MemoryContents(contents(pointer).toString)
   }
 
-  private def increaseMemoryUpToIndex(index: Long): Unit = {
-    val newContents = (0 to (index-contents.size).toInt).map(_ => 0).toArray
-    newContents.foreach(newValue => contents:+= newValue)
-  }
-
-  def setValue(pointer: Int, relativeBase: Int, value: Long, positionMode: Int = 0): Unit = {
+  def setValue(pointer: Long, relativeBase: Long, value: Long, positionMode: Int = 0): Unit = {
     val index = positionMode match {
       case 0 => contents(pointer) // position mode
       case _ => relativeBase + contents(pointer) // relative mode
     }
-
-    if (contents.size <= index) {
-      increaseMemoryUpToIndex(index)
-    }
-    contents(index.toInt) = value
+    contents(index) = value
   }
 
-  def getValueForParameter(pointer: Int, relativeBase: Int, positionMode: Int = 0): Long = {
+  def getValueForParameter(pointer: Long, relativeBase: Long, positionMode: Int = 0): Long = {
     val index = positionMode match {
       case 0 => contents(pointer) // position mode
       case 1 => pointer // direct mode
       case _ => relativeBase + contents(pointer) // relative mode
     }
-
-    if (contents.size <= index) {
-      increaseMemoryUpToIndex(index)
-    }
-
-    contents(index.toInt)
+    contents.getOrElse(index, 0)
   }
 }
 
-case class IntcodeComputer(phase: Int, memoryContents: String, stopOnOutput: Boolean = false) {
-  private val memory = memoryContents.split(",").map(_.toLong)
+case class IntcodeComputer(phase: Long, memoryContents: String, stopOnOutput: Boolean = false) {
+  private val memory: mutable.Map[Long, Long] = mutable.Map()
+
+  memoryContents.split(",").foldLeft(0L) { case(index, content) =>
+    memory.put(index, content.toLong)
+    index + 1
+  }
+
   private val inputsQueue = mutable.Queue[Long]()
   inputsQueue.enqueue(phase)
   private var outputs = ListBuffer[Long]()
-  private var instructionPointerState: Int = 0
-  private var relativeBase: Int = 0
+  private var instructionPointerState: Long = 0
+  private var relativeBase: Long = 0
 
   def executeProgram(inputs: Long*): Vector[Long] = {
     outputs = ListBuffer[Long]()
@@ -60,7 +52,7 @@ case class IntcodeComputer(phase: Int, memoryContents: String, stopOnOutput: Boo
   }
 
   @scala.annotation.tailrec
-  private def executeInstruction(memory: Memory, instructionPointer: Int): Memory = {
+  private def executeInstruction(memory: Memory, instructionPointer: Long): Memory = {
     val memoryContents = memory.getContent(instructionPointer)
     memoryContents.operation match {
       case 99 =>
@@ -93,48 +85,55 @@ case class IntcodeComputer(phase: Int, memoryContents: String, stopOnOutput: Boo
         equalsOp(memory, instructionPointer, memoryContents)
         executeInstruction(memory, instructionPointer+4)
       case 9 =>
-        val positionMode = memoryContents.getPositionMode(1)
-        val diff = memory.getValueForParameter(instructionPointer + 1, relativeBase, positionMode)
-        relativeBase += diff.toInt
+        adjustRelativeBase(memory, instructionPointer, memoryContents)
         executeInstruction(memory, instructionPointer+2)
     }
   }
 
-  private def outputOp(memory: Memory, instructionPointer: Int, memoryContents: MemoryContents) = {
+  private def adjustRelativeBase(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
+    println(s"Adjusting relative base with instruction ${memoryContents.contents}")
+    val positionMode = memoryContents.getPositionMode(1)
+    println(s"With position mode $positionMode")
+    val diff = memory.getValueForParameter(instructionPointer + 1, relativeBase, positionMode)
+    println(s"Increasing base by $diff")
+    relativeBase += diff
+  }
+
+  private def outputOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents) = {
     val positionMode = memoryContents.getPositionMode(1)
     val outputValue = memory.getValueForParameter(instructionPointer + 1, relativeBase, positionMode)
     outputs.addOne(outputValue)
   }
 
-  private def inputOp(memory: Memory, instructionPointer: Int, memoryContents: MemoryContents) = {
+  private def inputOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionMode = memoryContents.getPositionMode(1)
     val inputValue = inputsQueue.dequeue()
     memory.setValue(instructionPointer + 1, relativeBase, inputValue, positionMode)
   }
 
-  private def jumpIfFalseOp(memory: Memory, instructionPointer: Int, memoryContents: MemoryContents) = {
+  private def jumpIfFalseOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents) = {
     val positionMode1 = memoryContents.getPositionMode(1)
     val positionMode2 = memoryContents.getPositionMode(2)
     if (memory.getValueForParameter(instructionPointer + 1, relativeBase, positionMode1) == 0) {
       val newInstructionPointer = memory.getValueForParameter(instructionPointer + 2, relativeBase, positionMode2)
-      executeInstruction(memory, newInstructionPointer.toInt)
+      executeInstruction(memory, newInstructionPointer)
     } else {
       executeInstruction(memory, instructionPointer + 3)
     }
   }
 
-  private def jumpIfTrueOp(memory: Memory, instructionPointer: Int, memoryContents: MemoryContents) = {
+  private def jumpIfTrueOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Memory = {
     val positionMode1 = memoryContents.getPositionMode(1)
     val positionMode2 = memoryContents.getPositionMode(2)
     if (memory.getValueForParameter(instructionPointer + 1, relativeBase, positionMode1) != 0) {
       val newInstructionPointer = memory.getValueForParameter(instructionPointer + 2, relativeBase, positionMode2)
-      executeInstruction(memory, newInstructionPointer.toInt)
+      executeInstruction(memory, newInstructionPointer)
     } else {
       executeInstruction(memory, instructionPointer + 3)
     }
   }
 
-  private def timesOp(memory: Memory, instructionPointer: Int, memoryContents: MemoryContents) = {
+  private def timesOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionModeParam1 = memoryContents.getPositionMode(1)
     val positionModeParam2 = memoryContents.getPositionMode(2)
     val newValue = memory.getValueForParameter(instructionPointer + 1, relativeBase, positionModeParam1) *
@@ -142,7 +141,7 @@ case class IntcodeComputer(phase: Int, memoryContents: String, stopOnOutput: Boo
     memory.setValue(instructionPointer + 3, relativeBase, newValue)
   }
 
-  private def sumOp(memory: Memory, instructionPointer: Int, memoryContents: MemoryContents) = {
+  private def sumOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionModeParam1 = memoryContents.getPositionMode(1)
     val positionModeParam2 = memoryContents.getPositionMode(2)
     val newValue = memory.getValueForParameter(instructionPointer + 1, relativeBase, positionModeParam1) +
@@ -150,7 +149,7 @@ case class IntcodeComputer(phase: Int, memoryContents: String, stopOnOutput: Boo
     memory.setValue(instructionPointer + 3, relativeBase, newValue)
   }
 
-  private def lessThanOp(memory: Memory, instructionPointer: Int, memoryContents: MemoryContents) = {
+  private def lessThanOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionMode1 = memoryContents.getPositionMode(1)
     val positionMode2 = memoryContents.getPositionMode(2)
     val firstParam = memory.getValueForParameter(instructionPointer + 1, relativeBase, positionMode1)
@@ -162,7 +161,7 @@ case class IntcodeComputer(phase: Int, memoryContents: String, stopOnOutput: Boo
     }
   }
 
-  private def equalsOp(memory: Memory, instructionPointer: Int, memoryContents: MemoryContents) = {
+  private def equalsOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionMode1 = memoryContents.getPositionMode(1)
     val positionMode2 = memoryContents.getPositionMode(2)
     val firstParam = memory.getValueForParameter(instructionPointer + 1, relativeBase, positionMode1)
