@@ -138,40 +138,44 @@ case class IntcodeComputer(phase: Long, memoryContents: String, stopOnOutput: Bo
   private def timesOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionModeParam1 = memoryContents.getPositionMode(1)
     val positionModeParam2 = memoryContents.getPositionMode(2)
+    val positionModeParam3 = memoryContents.getPositionMode(3)
     val newValue = memory.getValueForParameter(instructionPointer + 1, positionModeParam1) *
       memory.getValueForParameter(instructionPointer + 2, positionModeParam2)
-    memory.setValue(instructionPointer + 3, newValue)
+    memory.setValue(instructionPointer + 3, newValue, positionModeParam3)
   }
 
   private def sumOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionModeParam1 = memoryContents.getPositionMode(1)
     val positionModeParam2 = memoryContents.getPositionMode(2)
+    val positionModeParam3 = memoryContents.getPositionMode(3)
     val newValue = memory.getValueForParameter(instructionPointer + 1, positionModeParam1) +
       memory.getValueForParameter(instructionPointer + 2, positionModeParam2)
-    memory.setValue(instructionPointer + 3, newValue)
+    memory.setValue(instructionPointer + 3, newValue, positionModeParam3)
   }
 
   private def lessThanOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionMode1 = memoryContents.getPositionMode(1)
     val positionMode2 = memoryContents.getPositionMode(2)
+    val positionMode3 = memoryContents.getPositionMode(3)
     val firstParam = memory.getValueForParameter(instructionPointer + 1, positionMode1)
     val secondParam = memory.getValueForParameter(instructionPointer + 2, positionMode2)
     if (firstParam < secondParam) {
-      memory.setValue(instructionPointer + 3, 1)
+      memory.setValue(instructionPointer + 3, 1, positionMode3)
     } else {
-      memory.setValue(instructionPointer + 3, 0)
+      memory.setValue(instructionPointer + 3, 0, positionMode3)
     }
   }
 
   private def equalsOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionMode1 = memoryContents.getPositionMode(1)
     val positionMode2 = memoryContents.getPositionMode(2)
+    val positionMode3 = memoryContents.getPositionMode(3)
     val firstParam = memory.getValueForParameter(instructionPointer + 1, positionMode1)
     val secondParam = memory.getValueForParameter(instructionPointer + 2, positionMode2)
     if (firstParam == secondParam) {
-      memory.setValue(instructionPointer + 3, 1)
+      memory.setValue(instructionPointer + 3, 1, positionMode3)
     } else {
-      memory.setValue(instructionPointer + 3, 0)
+      memory.setValue(instructionPointer + 3, 0, positionMode3)
     }
   }
 }
