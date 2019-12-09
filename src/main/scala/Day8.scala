@@ -13,11 +13,9 @@ case class Day8(code: String, width: Int, height: Int) {
   private def combineLayers(): Array[Char] = {
     (0 until (width * height)).map { index =>
       layers.foldLeft('2') { (previousPixel, newLayer) =>
-        val newPixel = newLayer.charAt(index)
-        (previousPixel, newPixel) match {
-          case ('2', _) => newPixel
-          case ('0', _) => '0'
-          case ('1', _) => '1'
+        previousPixel match {
+          case '2' => newLayer.charAt(index)
+          case other => other
         }
       }
     }.toArray
