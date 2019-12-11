@@ -1,5 +1,6 @@
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.util.Try
 
 case class MemoryContents(contents: String) {
   val operation: Int = contents.takeRight(2).toInt
@@ -36,7 +37,7 @@ case class Memory(var contents: mutable.Map[Long, Long]) {
   }
 }
 
-case class IntcodeComputer(phase: Long, memoryContents: String, stopOnOutput: Boolean = false) {
+case class IntcodeComputer(phase: Option[Long], memoryContents: String, stopOnOutput: Boolean = false) {
   private val memory: mutable.Map[Long, Long] = mutable.Map()
 
   memoryContents.split(",").foldLeft(0L) { case(index, content) =>
@@ -44,54 +45,65 @@ case class IntcodeComputer(phase: Long, memoryContents: String, stopOnOutput: Bo
     index + 1
   }
 
+  private val internalMemory = Memory(memory)
+  private var finished = false
+  private var defaultInput: Long = 0L
   private val inputsQueue = mutable.Queue[Long]()
-  inputsQueue.enqueue(phase)
+  phase.foreach(p => inputsQueue.enqueue(p))
   private var outputs = ListBuffer[Long]()
   private var instructionPointerState: Long = 0
 
   def executeProgram(inputs: Long*): Vector[Long] = {
     outputs = ListBuffer[Long]()
     inputsQueue.enqueueAll(inputs)
-    executeInstruction(Memory(memory), instructionPointerState)
+    executeInstruction(internalMemory, instructionPointerState)
     outputs.toVector
+  }
+
+  def setDefaultInput(input: Long): Unit = {
+    defaultInput = input
   }
 
   @scala.annotation.tailrec
   private def executeInstruction(memory: Memory, instructionPointer: Long): Memory = {
-    val memoryContents = memory.getContent(instructionPointer)
-    memoryContents.operation match {
-      case 99 =>
-        memory
-      case 1 =>
-        sumOp(memory, instructionPointer, memoryContents)
-        executeInstruction(memory, instructionPointer+4)
-      case 2 =>
-        timesOp(memory, instructionPointer, memoryContents)
-        executeInstruction(memory, instructionPointer+4)
-      case 3 =>
-        inputOp(memory, instructionPointer, memoryContents)
-        executeInstruction(memory, instructionPointer+2)
-      case 4 =>
-        outputOp(memory, instructionPointer, memoryContents)
-        if (!stopOnOutput)
-          executeInstruction(memory, instructionPointer+2)
-        else {
-          instructionPointerState = instructionPointer+2
+    if (finished) memory
+    else {
+      val memoryContents = memory.getContent(instructionPointer)
+      memoryContents.operation match {
+        case 99 =>
+          finished = true
           memory
-        }
-      case 5 =>
-        jumpIfTrueOp(memory, instructionPointer, memoryContents)
-      case 6 =>
-        jumpIfFalseOp(memory, instructionPointer, memoryContents)
-      case 7 =>
-        lessThanOp(memory, instructionPointer, memoryContents)
-        executeInstruction(memory, instructionPointer+4)
-      case 8 =>
-        equalsOp(memory, instructionPointer, memoryContents)
-        executeInstruction(memory, instructionPointer+4)
-      case 9 =>
-        adjustRelativeBase(memory, instructionPointer, memoryContents)
-        executeInstruction(memory, instructionPointer+2)
+        case 1 =>
+          sumOp(memory, instructionPointer, memoryContents)
+          executeInstruction(memory, instructionPointer+4)
+        case 2 =>
+          timesOp(memory, instructionPointer, memoryContents)
+          executeInstruction(memory, instructionPointer+4)
+        case 3 =>
+          inputOp(memory, instructionPointer, memoryContents)
+          executeInstruction(memory, instructionPointer+2)
+        case 4 =>
+          outputOp(memory, instructionPointer, memoryContents)
+          if (!stopOnOutput)
+            executeInstruction(memory, instructionPointer+2)
+          else {
+            instructionPointerState = instructionPointer+2
+            memory
+          }
+        case 5 =>
+          jumpIfTrueOp(memory, instructionPointer, memoryContents)
+        case 6 =>
+          jumpIfFalseOp(memory, instructionPointer, memoryContents)
+        case 7 =>
+          lessThanOp(memory, instructionPointer, memoryContents)
+          executeInstruction(memory, instructionPointer+4)
+        case 8 =>
+          equalsOp(memory, instructionPointer, memoryContents)
+          executeInstruction(memory, instructionPointer+4)
+        case 9 =>
+          adjustRelativeBase(memory, instructionPointer, memoryContents)
+          executeInstruction(memory, instructionPointer+2)
+      }
     }
   }
 
@@ -109,7 +121,7 @@ case class IntcodeComputer(phase: Long, memoryContents: String, stopOnOutput: Bo
 
   private def inputOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionMode = memoryContents.getPositionMode(1)
-    val inputValue = inputsQueue.dequeue()
+    val inputValue = Try(inputsQueue.dequeue()).toOption.getOrElse(defaultInput)
     memory.setValue(instructionPointer + 1, inputValue, positionMode)
   }
 

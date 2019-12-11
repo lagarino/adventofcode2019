@@ -4,7 +4,7 @@ case class Day7(programToRun: String) {
   def calculateMaxValueSentToThrusters(): Long = {
     val possibleValues = 0 to 4
     computePermutations(Vector.empty, possibleValues)
-      .map(combination => combination.map(phase => IntcodeComputer(phase, programToRun)))
+      .map(combination => combination.map(phase => IntcodeComputer(Option(phase), programToRun)))
       .flatMap(combination => calculateValueSentToThrusters(0, combination: _*)).max
   }
 
@@ -24,7 +24,7 @@ case class Day7(programToRun: String) {
   }
 
   def calculateValueSentToThrustersLooped(phaseSettings: Int*): Long = {
-    val computers = phaseSettings.map(phase => IntcodeComputer(phase, programToRun, stopOnOutput = true))
+    val computers = phaseSettings.map(phase => IntcodeComputer(Option(phase), programToRun, stopOnOutput = true))
 
     @scala.annotation.tailrec
     def feedBackOutput(fedBackValue: Long): Long = {
