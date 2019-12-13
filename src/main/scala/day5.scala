@@ -47,7 +47,7 @@ case class IntcodeComputer(phase: Option[Long], memoryContents: String, stopOnOu
 
   private val internalMemory = Memory(memory)
   private var finished = false
-  private var defaultInput: Long = 0L
+  private var obtainInput: () => Long = () => 0L
   private val inputsQueue = mutable.Queue[Long]()
   phase.foreach(p => inputsQueue.enqueue(p))
   private var outputs = ListBuffer[Long]()
@@ -61,7 +61,11 @@ case class IntcodeComputer(phase: Option[Long], memoryContents: String, stopOnOu
   }
 
   def setDefaultInput(input: Long): Unit = {
-    defaultInput = input
+    obtainInput = () => input
+  }
+
+  def setInputCallback(obtainInputCallback: () => Long): Unit = {
+    obtainInput = obtainInputCallback
   }
 
   @scala.annotation.tailrec
@@ -121,7 +125,7 @@ case class IntcodeComputer(phase: Option[Long], memoryContents: String, stopOnOu
 
   private def inputOp(memory: Memory, instructionPointer: Long, memoryContents: MemoryContents): Unit = {
     val positionMode = memoryContents.getPositionMode(1)
-    val inputValue = Try(inputsQueue.dequeue()).toOption.getOrElse(defaultInput)
+    val inputValue = Try(inputsQueue.dequeue()).toOption.getOrElse(obtainInput())
     memory.setValue(instructionPointer + 1, inputValue, positionMode)
   }
 
